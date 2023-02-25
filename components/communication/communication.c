@@ -105,12 +105,6 @@ void init_radio(NRF24_t *t)
 	Nrf24_SetSpeedDataRates(t,1);
 
 } 
-int get_latitude(states_u* s)
-{
-
-
-	return -1;
-}
 int receive_radio(NRF24_t* t,char* sendbuf)
 { 
 	int waited = 0;
@@ -180,14 +174,13 @@ void append_double(unsigned char* buf, double num)
 int get_states(unsigned char* buf, telemetry_t* tel) 
 { 
 	states_u s;
-	static double example = 100.44;
-	s.states_t.longitude = example + 31.2;
-	s.states_t.latitude = example-90.4;
-	s.states_t.orientation = 30.31;
-	example -= 5.6754;
-
 	xSemaphoreTake(tel->mutex, portMAX_DELAY);
+
+	s.states_t.longitude = tel->longitude;
+	s.states_t.latitude = tel->latitude;
+	s.states_t.orientation = tel->orientation;
 	s.states_t.velocity = tel->actual_speed;
+
 	xSemaphoreGive(tel->mutex);
 
 	for(int i = 0; i< sizeof(s.states_a)/sizeof(s.states_a[0]); ++i)

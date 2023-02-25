@@ -15,6 +15,8 @@ typedef struct telemetry_t{
 	double actual_speed;
 	double steering_angle;
 	double orientation;
+	double latitude;
+	double longitude;
 	SemaphoreHandle_t mutex;
 	TaskHandle_t* motor_task;
 	TaskHandle_t* gps_task;
