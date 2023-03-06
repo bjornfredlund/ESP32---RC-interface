@@ -29,6 +29,8 @@
 #define Ibin 6.0
 #define CONTROLLER_PERIOD 50 /* ms */
 
+#define COMMUNICATION_TIMEOUT 1000.0
+
 static inline uint32_t signal_to_duty_us(int duty)
 { 
 	return (duty + MOTOR_MAX) * (MOTOR_MAX_PULSEWIDTH_US - MOTOR_MIN_PULSEWIDTH_US) / (2 * MOTOR_MAX ) + MOTOR_MIN_PULSEWIDTH_US;
@@ -75,6 +77,11 @@ void motor_controller(void* arg)
 				continue;
 		} 
 
+		/* stop vehicle if no msg has been received for COMMUNICATION_TIMEOUT */
+		if((time - telemetry->last_time_updated) / 1000 > COMMUNICATION_TIMEOUT)
+		{ 
+			telemetry->desired_speed = 0.0;
+		} 
 
 
 		double duty = K*(telemetry->desired_speed - telemetry->actual_speed) + I;
@@ -136,7 +143,7 @@ static void speed_update_task(void* arg)
 			// testa med 50ms
 			if(xSemaphoreTake(tel->mutex, 50/portTICK_PERIOD_MS) != pdTRUE)
 			{ 
-					continue;
+				continue;
 			} 
 			double tmp = (double)(speed / (double)(1 << FRACTIONAL_BITS));
 			tel->actual_speed = tmp;
@@ -146,7 +153,7 @@ static void speed_update_task(void* arg)
 		{
 			if(xSemaphoreTake(tel->mutex, 50/portTICK_PERIOD_MS) != pdTRUE)
 			{ 
-					continue;
+				continue;
 			} 
 			tel->actual_speed = 0.0;
 			xSemaphoreGive(tel->mutex);

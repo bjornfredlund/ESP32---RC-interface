@@ -17,6 +17,7 @@ typedef struct telemetry_t{
 	double orientation;
 	double latitude;
 	double longitude;
+	int64_t last_time_updated;
 	SemaphoreHandle_t mutex;
 	TaskHandle_t* motor_task;
 	TaskHandle_t* gps_task;

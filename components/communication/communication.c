@@ -214,6 +214,7 @@ int write_output(unsigned char* recvbuf, telemetry_t* tel)
 	xSemaphoreTake(tel->mutex, portMAX_DELAY);
 	tel->steering_angle = angle;
 	tel->desired_speed = velocity;
+	tel->last_time_updated = esp_timer_get_time();
 	xSemaphoreGive(tel->mutex);
 
 	/* notify car task */
