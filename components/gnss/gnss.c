@@ -1,7 +1,8 @@
 #include "gnss.h"
 #include "driver/uart.h"
-#include <esp_log.h>
+#include "esp_log.h"
 #include <string.h>
+#include <sys/types.h>
 
 #include "minmea.h"
 
@@ -52,20 +53,58 @@ static void listen(telemetry_t* tel)
 										  struct minmea_sentence_vtg frame;
 										  if (minmea_parse_vtg(&frame, line)) {
 											  xSemaphoreTake(tel->mutex, portMAX_DELAY);
-											  tel->actual_speed = minmea_tofloat(&frame.speed_kph);
 											  tel->orientation = minmea_tofloat(&frame.true_track_degrees);
 											  xSemaphoreGive(tel->mutex);
 										  }
-										  else {
-											  ESP_LOGI("SAD", "$xxVTG sentence is not parsed\n");
-										  }
 										  break;
-									  } 
-
-			default:
-									  break;
+									  }
+		default:
+		break;
 		} 
+
+	} 
+} 
+
+void update_receive_frequency()
+{ 
+	// Send UBX message to set update rate to 5 Hz
+	//uint8_t ubx_msg[] = {0xB5, 0x62, 0x06, 0x08, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00};
+	uint8_t ubx_msg[] = {0xB5,0x62,0x06,0x08,0x06,0x00,0xC8,0x00,0x01,0x00,0x01,0x00,0xDE,0x6A};
+	uart_write_bytes(UART_NUM_1, (const char *)ubx_msg, sizeof(ubx_msg));
+
+	// Wait for receiver to acknowledge UBX message
+	uint8_t ack[] = {0xB5, 0x62, 0x05, 0x01, 0x02, 0x00, 0x08, 0x22};
+	uint8_t ack_buf[sizeof(ack)];
+	while (memcmp(ack_buf, ack, sizeof(ack)) != 0) {
+		size_t len = uart_read_bytes(UART_NUM_1, ack_buf, sizeof(ack_buf), 100 / portTICK_RATE_MS);
+		if (len == sizeof(ack)) {
+			break;
+		}
 	}
+} 
+
+void disable_all_but_rmc()
+{ 
+	u_int8_t msg[] = { 
+		0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x24, // GxGGA off
+		0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x01,0x2B, // GxGLL off
+		0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x02,0x00,0x00,0x00,0x00,0x00,0x01,0x02,0x32, // GxGSA off
+		0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x03,0x00,0x00,0x00,0x00,0x00,0x01,0x03,0x39, // GxGSV off
+		0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x05,0x00,0x00,0x00,0x00,0x00,0x01,0x05,0x47 // GxVTG off
+	};
+	// Send UBX message to disable all NMEA messages except RMC
+	uart_write_bytes(UART_NUM_1, (const char *)msg, sizeof(msg));
+
+	// Wait for receiver to acknowledge last UBX message
+	uint8_t ack[] = {0xB5, 0x62, 0x05, 0x01, 0x02, 0x00, 0x06, 0x0A};
+	uint8_t ack_buf[sizeof(ack)];
+	while (memcmp(ack_buf, ack, sizeof(ack)) != 0) {
+		size_t len = uart_read_bytes(UART_NUM_1, ack_buf, sizeof(ack_buf), 100 / portTICK_RATE_MS);
+		if (len == sizeof(ack)) {
+			break;
+		}
+	}
+
 } 
 
 static void init_gnss()
@@ -90,5 +129,7 @@ void gnss_task(void* arg)
 { 
 	telemetry_t* tel = (telemetry_t*)arg;
 	init_gnss();
+	disable_all_but_rmc();
+	update_receive_frequency();
 	listen(tel);
 } 
